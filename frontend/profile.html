@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <nav id="navbar" class="navbar"></nav>
+    <div class="container">
+        <h1>Профиль</h1>
+        <div id="userInfo" class="user-info"></div>
+        <button onclick="showEditForm()">Редактировать профиль</button>
+        <a href="my-books.html" class="my-books-btn">Мои книги</a>
+        <form id="editProfileForm" style="display: none;">
+            <div class="form-group">
+                <label for="editLogin">Логин</label>
+                <input type="text" id="editLogin" required>
+            </div>
+            <div class="form-group">
+                <label for="editEmail">Email</label>
+                <input type="email" id="editEmail" required>
+            </div>
+            <div class="form-group">
+                <label for="editCity">Город</label>
+                <input type="text" id="editCity" required>
+            </div>
+            <div class="form-group">
+                <label for="editPassword">Новый пароль (оставьте пустым, чтобы не менять)</label>
+                <input type="password" id="editPassword">
+            </div>
+            <button type="submit">Сохранить</button>
+            <button type="button" onclick="hideEditForm()">Отмена</button>
+        </form>
+        <p id="error" class="error"></p>
+    </div>
+    <script src="js/api.js"></script>
+    <script>
+        let currentUser = null;
+
+        function renderNavbar() {
+            const token = localStorage.getItem('token');
+            const isAdmin = localStorage.getItem('isAdmin') === 'true';
+            const navbar = document.getElementById('navbar');
+            navbar.innerHTML = `
+                <a href="index.html">Главная</a>
+                ${token ? `
+                    <a href="profile.html">Профиль</a>
+                    ${isAdmin ? '<a href="admin.html">Админ-панель</a>' : ''}
+                    <button onclick="logout()">Выйти</button>
+                ` : `
+                    <a href="login.html">Войти</a>
+                    <a href="register.html">Регистрация</a>
+                `}
+            `;
+            if (!token) {
+                window.location.href = 'login.html';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('isAdmin');
+            window.location.href = 'login.html';
+        }
+
+        async function loadUser() {
+            const userId = localStorage.getItem('userId');
+            const token = localStorage.getItem('token');
+            if (!userId || !token) {
+                window.location.href = 'login.html';
+                return;
+            }
+            try {
+                const user = await getUser(userId, token);
+                currentUser = user;
+                const userInfo = document.getElementById('userInfo');
+                userInfo.innerHTML = `
+                    <div class="user-card">
+                        <p><strong>Логин:</strong> ${user.login}</p>
+                        <p><strong>Email:</strong> ${user.email}</p>
+                        <p><strong>Город:</strong> ${user.city}</p>
+                        <p><strong>Админ:</strong> ${user.is_admin ? 'Да' : 'Нет'}</p>
+                    </div>
+                `;
+            } catch (err) {
+                document.getElementById('error').textContent = `Ошибка загрузки пользователя: ${err.message}`;
+                if (err.message.includes('404')) {
+                    logout();
+                }
+            }
+        }
+
+        function showEditForm() {
+            if (!currentUser) {
+                document.getElementById('error').textContent = 'Данные пользователя не загружены';
+                return;
+            }
+            const form = document.getElementById('editProfileForm');
+            document.getElementById('editLogin').value = currentUser.login;
+            document.getElementById('editEmail').value = currentUser.email;
+            document.getElementById('editCity').value = currentUser.city;
+            document.getElementById('editPassword').value = '';
+            form.style.display = 'block';
+        }
+
+        function hideEditForm() {
+            const form = document.getElementById('editProfileForm');
+            form.style.display = 'none';
+            form.reset();
+        }
+
+        document.getElementById('editProfileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userId = localStorage.getItem('userId');
+            const token = localStorage.getItem('token');
+            const data = {
+                login: document.getElementById('editLogin').value,
+                email: document.getElementById('editEmail').value,
+                city: document.getElementById('editCity').value,
+            };
+            const password = document.getElementById('editPassword').value;
+            if (password) {
+                data.password = password;
+            }
+            try {
+                await updateUser(userId, data, token);
+                alert('Профиль успешно обновлен');
+                hideEditForm();
+                loadUser();
+            } catch (err) {
+                document.getElementById('error').textContent = `Ошибка обновления профиля: ${err.message}`;
+            }
+        });
+
+        window.onload = () => {
+            renderNavbar();
+            loadUser();
+        };
+    </script>
+</body>
+
+</html>

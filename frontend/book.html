@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Книга</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <nav id="navbar" class="navbar"></nav>
+    <div class="container">
+        <h1 id="bookTitle"></h1>
+        <div id="bookDetails" class="book-details"></div>
+        <p id="error" class="error"></p>
+    </div>
+    <script src="js/api.js"></script>
+    <script>
+        function renderNavbar() {
+            const token = localStorage.getItem('token');
+            const isAdmin = localStorage.getItem('isAdmin') === 'true';
+            const navbar = document.getElementById('navbar');
+            navbar.innerHTML = `
+                <a href="index.html">Главная</a>
+                ${token ? `
+                    <a href="profile.html">Профиль</a>
+                    ${isAdmin ? '<a href="admin.html">Админ-панель</a>' : ''}
+                    <button onclick="logout()">Выйти</button>
+                ` : `
+                    <a href="login.html">Войти</a>
+                    <a href="register.html">Регистрация</a>
+                `}
+            `;
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('isAdmin');
+            window.location.href = 'login.html';
+        }
+
+        async function loadBook() {
+            const bookId = new URLSearchParams(window.location.search).get('id');
+            if (!bookId) {
+                document.getElementById('error').textContent = 'Книга не указана';
+                return;
+            }
+            try {
+                const book = await getBook(bookId);
+                document.getElementById('bookTitle').textContent = book.title;
+                document.getElementById('bookDetails').innerHTML = `
+                    <div class="book-card full-width">
+                        <img src="${book.cover_image}" alt="${book.title}" class="book-image" onerror="this.src='https://via.placeholder.com/150';"> 
+                        <div class="book-content">
+                            <p>Автор: ${book.author}</p>
+                            <p>Жанр: ${book.genre}</p>
+                            <p>Год: ${book.year}</p>
+                            <p>Состояние: ${book.condition}</p>
+                            <p>Город: ${book.city}</p>
+                            <p>Владелец: ${book.owner_login}</p>
+                            <p>Контакты: ${book.contacts || 'Не указаны'}</p>
+                            <p>Статус: ${book.status}</p>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                document.getElementById('error').textContent = `Ошибка загрузки книги: ${err.message}`;
+            }
+        }
+
+        window.onload = () => {
+            renderNavbar();
+            loadBook();
+        };
+    </script>
+</body>
+
+</html>

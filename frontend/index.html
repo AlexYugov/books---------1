@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Каталог книг</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <nav id="navbar" class="navbar"></nav>
+    <div class="container">
+        <h1>Каталог книг</h1>
+        <div class="filters">
+            <input type="text" id="search" placeholder="Поиск по названию или автору...">
+            <select id="genreFilter">
+                <option value="">Все жанры</option>
+                <option value="фантастика">Фантастика</option>
+                <option value="детектив">Детектив</option>
+                <option value="роман">Роман</option>
+                <option value="классика">Классика</option>
+            </select>
+            <input type="text" id="cityFilter" placeholder="Город...">
+        </div>
+        <div id="books" class="books-grid"></div>
+        <div id="pagination" class="pagination"></div>
+        <p id="error" class="error"></p>
+    </div>
+    <script src="js/api.js"></script>
+    <script>
+        let currentPage = 0;
+        const limit = 10;
+        function renderNavbar() {
+            const token = localStorage.getItem('token');
+            const isAdmin = localStorage.getItem('isAdmin') === 'true';
+            const navbar = document.getElementById('navbar');
+            navbar.innerHTML = `
+                <a href="index.html">Главная</a>
+                ${token ? `
+                    <a href="profile.html">Профиль</a>
+                    ${isAdmin ? '<a href="admin.html">Админ-панель</a>' : ''}
+                    <button onclick="logout()">Выйти</button>
+                ` : `
+                    <a href="login.html">Войти</a>
+                    <a href="register.html">Регистрация</a>
+                `}
+            `;
+        }
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('isAdmin');
+            window.location.href = 'login.html';
+        }
+        async function loadBooks(page) {
+            const search = document.getElementById('search').value;
+            const genre = document.getElementById('genreFilter').value;
+            const city = document.getElementById('cityFilter').value;
+            try {
+                const data = await getBooks(page * limit, limit, search, genre, city);
+                const books = document.getElementById('books');
+                books.innerHTML = data.map(book => `
+                    <div class="book-card">
+                        <img src="${book.cover_image}" alt="${book.title}" class="book-image">
+                        <div class="book-content">
+                            <h3><a href="book.html?id=${book.id}">${book.title}</a></h3>
+                            <p>Автор: ${book.author}</p>
+                            <p>Состояние: ${book.condition}</p>
+                            <p>Город: ${book.city}</p>
+                            <p>Контакты: ${book.contacts || 'Не указаны'}</p>
+                            <p>Владелец: ${book.owner_login}</p>
+                        </div>
+                    </div>
+                `).join('');
+                renderPagination(page, data.length === limit);
+            } catch (err) {
+                document.getElementById('error').textContent = `Ошибка: ${err.message}`;
+            }
+        }
+        function renderPagination(page, hasMore) {
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = `
+                <button onclick="loadBooks(${page - 1})" ${page === 0 ? 'disabled' : ''}>Назад</button>
+                <span>Страница ${page + 1}</span>
+                <button onclick="loadBooks(${page + 1})" ${!hasMore ? 'disabled' : ''}>Вперед</button>
+            `;
+        }
+        document.getElementById('search').addEventListener('input', () => loadBooks(0));
+        document.getElementById('genreFilter').addEventListener('change', () => loadBooks(0));
+        document.getElementById('cityFilter').addEventListener('input', () => loadBooks(0));
+        window.onload = () => {
+            renderNavbar();
+            loadBooks(0);
+        };
+    </script>
+</body>
+
+</html>

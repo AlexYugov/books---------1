@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <nav id="navbar" class="navbar"></nav>
+    <div class="container">
+        <h1>Админ-панель</h1>
+        <!-- Управление книгами -->
+        <h2>Управление книгами</h2>
+        <form id="bookForm">
+            <div class="form-group">
+                <label for="bookId">ID книги (для редактирования)</label>
+                <input type="number" id="bookId" readonly>
+            </div>
+            <div class="form-group">
+                <label for="bookTitle">Название</label>
+                <input type="text" id="bookTitle" required>
+            </div>
+            <div class="form-group">
+                <label for="bookAuthor">Автор</label>
+                <input type="text" id="bookAuthor" required>
+            </div>
+            <div class="form-group">
+                <label for="bookGenre">Жанр</label>
+                <select id="bookGenre" required>
+                    <option value="фантастика">Фантастика</option>
+                    <option value="детектив">Детектив</option>
+                    <option value="роман">Роман</option>
+                    <option value="классика">Классика</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="bookYear">Год издания</label>
+                <input type="number" id="bookYear" required>
+            </div>
+            <div class="form-group">
+                <label for="bookCondition">Состояние</label>
+                <select id="bookCondition" required>
+                    <option value="новая">Новая</option>
+                    <option value="хорошее">Хорошее</option>
+                    <option value="удовлетворительное">Удовлетворительное</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="bookCity">Город</label>
+                <input type="text" id="bookCity" required>
+            </div>
+            <div class="form-group">
+                <label for="bookImage">URL обложки</label>
+                <input type="text" id="bookImage" required>
+            </div>
+            <div class="form-group">
+                <label for="bookContacts">Контакты для связи</label>
+                <input type="text" id="bookContacts" placeholder="Например: email@example.com или @telegram">
+            </div>
+            <button type="submit">Создать/Обновить книгу</button>
+            <button type="button" id="resetForm" onclick="resetBookForm()">Сбросить</button>
+        </form>
+        <div id="books" class="books-grid"></div>
+        <div class="pagination" id="booksPagination"></div>
+        <!-- Управление пользователями -->
+        <h2>Управление пользователями</h2>
+        <div id="users" class="users-grid"></div>
+        <br>
+        <div class="pagination" id="usersPagination"></div>
+        <p id="error" class="error"></p>
+    </div>
+    <script src="js/api.js"></script>
+    <script>
+        let bookPage = 0;
+        let userPage = 0;
+        const limit = 10;
+
+        function renderNavbar() {
+            const token = localStorage.getItem('token');
+            const isAdmin = localStorage.getItem('isAdmin') === 'true';
+            const navbar = document.getElementById('navbar');
+            navbar.innerHTML = `
+                <a href="index.html">Главная</a>
+                ${token ? `
+                    <a href="profile.html">Профиль</a>
+                    ${isAdmin ? '<a href="admin.html">Админ-панель</a>' : ''}
+                    <button onclick="logout()">Выйти</button>
+                ` : `
+                    <a href="login.html">Войти</a>
+                    <a href="register.html">Регистрация</a>
+                `}
+            `;
+            if (!token || !isAdmin) {
+                window.location.href = 'login.html';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('isAdmin');
+            window.location.href = 'login.html';
+        }
+
+        async function loadBooks() {
+            const token = localStorage.getItem('token');
+            try {
+                const books = await getBooks(bookPage * limit, limit);
+                const booksDiv = document.getElementById('books');
+                booksDiv.innerHTML = books.map(book => `
+                    <div class="book-card">
+                        <h3>${book.title}</h3>
+                        <p>Автор: ${book.author}</p>
+                        <p>Город: ${book.city}</p>
+                        <p>Состояние: ${book.condition}</p>
+                        <p>Контакты: ${book.contacts || 'Не указаны'}</p>
+                        <img src="${book.cover_image}" alt="${book.title}" class="book-image" onerror="this.src='https://via.placeholder.com/150x200';"> 
+                        <div class="book-actions">
+                            <button onclick="editBook(${book.id}, '${book.title.replace(/'/g, "\\'")}', '${book.author.replace(/'/g, "\\'")}', '${book.genre}', ${book.year}, '${book.condition}', '${book.city}', '${book.cover_image.replace(/'/g, "\\'")}', '${book.contacts ? book.contacts.replace(/'/g, "\\'") : ''}')">Редактировать</button>
+                            <button onclick="deleteBook(${book.id})">Удалить</button>
+                        </div>
+                    </div>
+                `).join('');
+                renderBooksPagination(books.length === limit);
+            } catch (err) {
+                document.getElementById('error').textContent = `Ошибка загрузки книг: ${err.message}`;
+            }
+        }
+
+        function renderBooksPagination(hasMore) {
+            const pagination = document.getElementById('booksPagination');
+            pagination.innerHTML = `
+                <button onclick="bookPage--; loadBooks();" ${bookPage === 0 ? 'disabled' : ''}>Назад</button>
+                <span>Страница ${bookPage + 1}</span>
+                <button onclick="bookPage++; loadBooks();" ${!hasMore ? 'disabled' : ''}>Вперед</button>
+            `;
+        }
+
+        async function loadUsers() {
+            const token = localStorage.getItem('token');
+            const currentUserId = localStorage.getItem('userId');
+            try {
+                const users = await getAllUsers(userPage * limit, limit, '', token);
+                const usersDiv = document.getElementById('users');
+                usersDiv.innerHTML = users.map(user => `
+                    <div class="user-card">
+                        <p>ID: ${user.id}, Логин: ${user.login}, Email: ${user.email}, Город: ${user.city}, Админ: ${user.is_admin ? 'Да' : 'Нет'}</p>
+                        <div class="user-actions">
+                            ${user.id != currentUserId ? `<button onclick="deleteUser(${user.id})">Удалить</button>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+                renderUsersPagination(users.length === limit);
+            } catch (err) {
+                document.getElementById('error').textContent = `Ошибка загрузки пользователей: ${err.message}`;
+            }
+        }
+
+        function renderUsersPagination(hasMore) {
+            const pagination = document.getElementById('usersPagination');
+            pagination.innerHTML = `
+                <button onclick="userPage--; loadUsers();" ${userPage === 0 ? 'disabled' : ''}>Назад</button>
+                <span>Страница ${userPage + 1}</span>
+                <button onclick="userPage++; loadUsers();" ${!hasMore ? 'disabled' : ''}>Вперед</button>
+            `;
+        }
+
+        document.getElementById('bookForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = localStorage.getItem('token');
+            const id = document.getElementById('bookId').value;
+            const data = {
+                title: document.getElementById('bookTitle').value,
+                author: document.getElementById('bookAuthor').value,
+                genre: document.getElementById('bookGenre').value,
+                year: parseInt(document.getElementById('bookYear').value),
+                condition: document.getElementById('bookCondition').value,
+                city: document.getElementById('bookCity').value,
+                cover_image: document.getElementById('bookImage').value,
+                contacts: document.getElementById('bookContacts').value || null
+            };
+            try {
+                if (id) {
+                    await updateBook(id, data, token);
+                    alert('Книга обновлена');
+                } else {
+                    await createBook(data, token);
+                    alert('Книга создана');
+                }
+                resetBookForm();
+                loadBooks();
+            } catch (err) {
+                document.getElementById('error').textContent = `Ошибка: ${err.message}`;
+            }
+        });
+
+        function editBook(id, title, author, genre, year, condition, city, cover_image, contacts) {
+            document.getElementById('bookId').value = id;
+            document.getElementById('bookTitle').value = title;
+            document.getElementById('bookAuthor').value = author;
+            document.getElementById('bookGenre').value = genre;
+            document.getElementById('bookYear').value = year;
+            document.getElementById('bookCondition').value = condition;
+            document.getElementById('bookCity').value = city;
+            document.getElementById('bookImage').value = cover_image;
+            document.getElementById('bookContacts').value = contacts || '';
+        }
+
+        function resetBookForm() {
+            document.getElementById('bookForm').reset();
+            document.getElementById('bookId').value = '';
+        }
+
+        async function deleteBook(bookId) {
+            const token = localStorage.getItem('token');
+            if (!confirm('Вы уверены, что хотите удалить книгу?')) return;
+            try {
+                await apiRequest(`/books/${bookId}`, 'DELETE', null, token);
+                alert("Книга успешно удалена!");
+                loadBooks();
+            } catch (err) {
+                document.getElementById('error').textContent = `Ошибка удаления: ${err.message}`;
+            }
+        }
+
+        async function deleteUser(userId) {
+            const token = localStorage.getItem('token');
+            if (!confirm('Вы уверены, что хотите удалить пользователя?')) return;
+            try {
+                await apiRequest(`/users/${userId}`, 'DELETE', null, token);
+                loadUsers();
+            } catch (err) {
+                document.getElementById('error').textContent = `Ошибка удаления: ${err.message}`;
+            }
+        }
+
+        window.onload = () => {
+            renderNavbar();
+            loadBooks();
+            loadUsers();
+        };
+    </script>
+</body>
+
+</html>
