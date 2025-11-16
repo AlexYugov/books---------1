@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    SECRET_KEY: str = "books"  # Замените на безопасный ключ
+    SECRET_KEY: str = "books"  
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
